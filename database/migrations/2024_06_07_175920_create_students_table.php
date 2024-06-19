@@ -20,7 +20,8 @@ return new class extends Migration
             $table->string('phone_number');
             $table->text('address');
             $table->date('date_of_birth');
-            $table->string('guardian_name');
+            $table->unsignedBigInteger('user_id');
+            $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
 
