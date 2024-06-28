@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Teacher;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 
@@ -13,10 +14,12 @@ class TeacherController extends Controller
      */
     public function create(Request $request)
     {
-
+        // Validation
         $validator = Validator::make($request->all(), [
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users',
+            'password' => 'required|string|min:6',
             'gender' => 'required|string|in:male,female,other',
             'phone_number' => 'required|string|max:15|unique:teachers,phone_number',
             'address' => 'required|string|max:255',
@@ -27,16 +30,34 @@ class TeacherController extends Controller
             return response()->json(['error' => $validator->errors()], 400);
         }
 
+        // Create User
+        $user = User::create([
+            "name" => $request->first_name . " " . $request->last_name,
+            "email" => $request->email,
+            "password" => $request->password
+        ]);
+
+        if (!$user) {
+            return response()->json(['error' => 'Failed to create user'], 500);
+        }
+
+        // Create Teacher
         $teacher = Teacher::create([
             "first_name" => $request->first_name,
             "last_name" => $request->last_name,
             "gender" => $request->gender,
             "phone_number" => $request->phone_number,
             "address" => $request->address,
-            "subject_specialization" => $request->subject_specialization
+            "subject_specialization" => $request->subject_specialization,
+            "user_id" => $user->id
         ]);
 
-        return response()->json(["message" => "Teacher created successfully", "data" => $teacher]);
+        if (!$teacher) {
+            User::where("id", $user->id)->delete();
+            return response()->json(['error' => 'Failed to create teacher'], 500);
+        }
+
+        return response()->json(["message" => "Teacher created successfully", "teacher" => $teacher->user], 200);
     }
 
     /**

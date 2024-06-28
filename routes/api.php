@@ -8,7 +8,7 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
-Route::post("/teacher", [TeacherController::class, "Create"]);
+Route::post("/teacher", [TeacherController::class, "create"]);
 Route::get("/teacher/{id}", [TeacherController::class, "get"]);
 Route::delete("/teacher/{id}", [TeacherController::class, "delete"]);
 Route::patch("/teacher/{id}", [TeacherController::class, "patch"]);
