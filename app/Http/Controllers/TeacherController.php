@@ -24,7 +24,7 @@ class TeacherController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:6',
             'gender' => 'required|string|in:male,female,other',
-            'phone_number' => 'required|string|max:15|unique:teachers,phone_number',
+            'phone_number' => 'required|string|size:10|unique:teachers,phone_number',
             'address' => 'required|string|max:255',
             'subject_specialization' => 'required|string|max:255',
         ]);
@@ -112,11 +112,11 @@ class TeacherController extends Controller
         $validator = Validator::make($request->all(), [
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|required|string|max:255',
-            'gender' => 'sometimes|required|string|in:male,female,other',
+            'email' => "sometimes|required|email|unique:users,email,{$id},id",
             'phone_number' => "sometimes|required|string|max:15|unique:teachers,phone_number,{$id},id",
+            'gender' => 'sometimes|required|string|in:male,female,other',
             'address' => 'sometimes|required|string|max:255',
             'subject_specialization' => 'sometimes|required|string|max:255',
-            'email' => "sometimes|required|email|unique:users,email,{$id},id",
         ]);
 
         if ($validator->fails()) {

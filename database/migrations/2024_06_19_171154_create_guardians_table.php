@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string("first_name");
             $table->string("last_name");
             $table->enum('gender', ['male', 'female', 'other']);
-            $table->string('phone_number');
+            $table->string('phone_number')->unique();
             $table->unsignedBigInteger('user_id');
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });

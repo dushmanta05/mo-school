@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
-class GuardianController extends Controller
+class UserController extends Controller
 {
     /**
      * Create a new resource.
@@ -21,8 +21,6 @@ class GuardianController extends Controller
             'last_name' => 'required|string|max:255',
             'email' => 'required|email|unique:users',
             'password' => 'required|string|min:6',
-            'gender' => 'required|string|in:male,female,other',
-            'phone_number' => 'required|string|size:10|unique:guardians,phone_number',
         ]);
 
         if ($validator->fails()) {
@@ -38,24 +36,17 @@ class GuardianController extends Controller
                 "password" => $request->password
             ]);
 
-            $guardian = $user->guardian()->create([
-                "first_name" => $request->first_name,
-                "last_name" => $request->last_name,
-                "gender" => $request->gender,
-                "phone_number" => $request->phone_number,
-            ]);
-
             DB::commit();
 
             return response()->json([
                 "success" => true,
-                "message" => "Guardian created successfully",
-                "guardian" => $guardian->load('user')
+                "message" => "User created successfully",
+                "guardian" => $user
             ], 201);
         } catch (Exception $exception) {
             DB::rollBack();
-            Log::error('Guardian creation failed: ' . $exception->getMessage());
-            return response()->json(['success' => false, 'message' => 'Failed to create guardian', "error" => $exception->getMessage()], 500);
+            Log::error('User creation failed: ' . $exception->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to create user', "error" => $exception->getMessage()], 500);
         }
     }
 }
