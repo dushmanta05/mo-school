@@ -4,7 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Teacher;
 use App\Models\User;
+use Exception;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class TeacherController extends Controller
@@ -27,37 +30,39 @@ class TeacherController extends Controller
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 400);
+            return response()->json(['success' => false, 'error' => $validator->errors()], 400);
         }
 
-        // Create User
-        $user = User::create([
-            "name" => $request->first_name . " " . $request->last_name,
-            "email" => $request->email,
-            "password" => $request->password
-        ]);
+        try {
+            DB::beginTransaction();
 
-        if (!$user) {
-            return response()->json(['error' => 'Failed to create user'], 500);
+            $user = User::create([
+                "name" => $request->first_name . " " . $request->last_name,
+                "email" => $request->email,
+                "password" => $request->password
+            ]);
+
+            $teacher = $user->teacher()->create([
+                "first_name" => $request->first_name,
+                "last_name" => $request->last_name,
+                "gender" => $request->gender,
+                "phone_number" => $request->phone_number,
+                "address" => $request->address,
+                "subject_specialization" => $request->subject_specialization,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                "success" => true,
+                "message" => "Teacher created successfully",
+                "teacher" => $teacher->load('user')
+            ], 201);
+        } catch (Exception $exception) {
+            DB::rollBack();
+            Log::error('Teacher creation failed: ' . $exception->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to create teacher', "error" => $exception->getMessage()], 500);
         }
-
-        // Create Teacher
-        $teacher = Teacher::create([
-            "first_name" => $request->first_name,
-            "last_name" => $request->last_name,
-            "gender" => $request->gender,
-            "phone_number" => $request->phone_number,
-            "address" => $request->address,
-            "subject_specialization" => $request->subject_specialization,
-            "user_id" => $user->id
-        ]);
-
-        if (!$teacher) {
-            User::where("id", $user->id)->delete();
-            return response()->json(['error' => 'Failed to create teacher'], 500);
-        }
-
-        return response()->json(["message" => "Teacher created successfully", "teacher" => $teacher->user], 200);
     }
 
     /**
@@ -65,11 +70,11 @@ class TeacherController extends Controller
      */
     public function get($id)
     {
-        $teacher = Teacher::find($id);
+        $teacher = Teacher::with('user')->find($id);
         if (!$teacher) {
-            return response()->json(['error' => 'Teacher not found'], 404);
+            return response()->json(['success' => false, 'error' => 'Teacher not found'], 404);
         }
-        return response()->json(["data" => $teacher], 200);
+        return response()->json(['success' => true, "data" => $teacher], 200);
     }
 
     /**
@@ -80,12 +85,23 @@ class TeacherController extends Controller
         $teacher = Teacher::find($id);
 
         if (!$teacher) {
-            return response()->json(['error' => 'Teacher not found'], 404);
+            return response()->json(['success' => false, 'error' => 'Teacher not found'], 404);
         }
 
-        $teacher->delete();
+        try {
+            DB::beginTransaction();
 
-        return response()->json(["message" => "Teacher deleted successfully"], 200);
+            $teacher->user()->delete();
+            $teacher->delete();
+
+            DB::commit();
+
+            return response()->json(['success' => true, "message" => "Teacher deleted successfully"], 200);
+        } catch (Exception $exception) {
+            DB::rollBack();
+            Log::error('Teacher deletion failed: ' . $exception->getMessage());
+            return response()->json(['success' => false, 'error' => 'Failed to delete teacher'], 500);
+        }
     }
 
     /**
@@ -97,30 +113,42 @@ class TeacherController extends Controller
             'first_name' => 'sometimes|required|string|max:255',
             'last_name' => 'sometimes|required|string|max:255',
             'gender' => 'sometimes|required|string|in:male,female,other',
-            'phone_number' => 'sometimes|required|string|max:15|unique:teachers,phone_number',
+            'phone_number' => "sometimes|required|string|max:15|unique:teachers,phone_number,{$id},id",
             'address' => 'sometimes|required|string|max:255',
             'subject_specialization' => 'sometimes|required|string|max:255',
+            'email' => "sometimes|required|email|unique:users,email,{$id},id",
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 400);
+            return response()->json(['success' => false, 'error' => $validator->errors()], 400);
         }
 
-        $teacher = Teacher::find($id);
+        $teacher = Teacher::with('user')->find($id);
 
         if (!$teacher) {
-            return response()->json(['error' => 'Teacher not found'], 404);
+            return response()->json(['success' => false, 'error' => 'Teacher not found'], 404);
         }
 
-        $teacher->update($request->only([
-            "first_name" => $request->first_name,
-            "last_name" => $request->last_name,
-            "gender" => $request->gender,
-            "phone_number" => $request->phone_number,
-            "address" => $request->address,
-            "subject_specialization" => $request->subject_specialization
-        ]));
+        try {
+            DB::beginTransaction();
 
-        return response()->json(["data" => $teacher], 200);
+            $teacher->fill($request->only([
+                'first_name', 'last_name', 'gender', 'phone_number', 'address', 'subject_specialization'
+            ]));
+            $teacher->save();
+
+            if ($request->has('email')) {
+                $teacher->user->email = $request->email;
+                $teacher->user->name = $request->first_name . ' ' . $request->last_name;
+                $teacher->user->save();
+            }
+
+            DB::commit();
+            return response()->json(['success' => false, "data" => $teacher->fresh('user')], 200);
+        } catch (Exception $exception) {
+            DB::rollBack();
+            Log::error('Teacher update failed: ' . $exception->getMessage());
+            return response()->json(['success' => false, 'error' => 'Failed to update teacher'], 500);
+        }
     }
 }
